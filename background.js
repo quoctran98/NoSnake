@@ -1,6 +1,6 @@
-const clarifaiKey = "aa85483e9a9144538c8bea5fe28d4754";
+const clarifaiKey = "";
 
-// Bad workds :(
+// Bad words :(
 const targetConcepts = ["snake", "dog"];
 
 // Initializing Clarifai App
@@ -24,6 +24,18 @@ let backlog = []; // JSON objects from content.js messages
 function resolveBacklog () {
   if (backlog.length > 0) { // If there is a backlog:
     let request = backlog[0];
+    
+    // Check alt text for bad words (faster and save on Clarifai calls)
+    for (i = 0; i < targetConcepts.length; i++) {
+      if (request.alt.search(targetConcepts[i]) != -1) {
+        console.log("Image #" + request.index + " from " + request.sender.tab.url + " has 'snake' in alt text");
+        sendToTab(request.sender, {
+          isSnake: true,
+          index: request.index
+        });
+        break;
+      }
+    }
     
     if (request.type === "url") { // for URL source
       
@@ -123,9 +135,10 @@ chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
     backlog.push({
       sender: sender,
+      alt: request.alt,
+      type: request.type,
       source: request.source,
       base64: request.base64,
-      type: request.type,
       index: request.index
     })
   }

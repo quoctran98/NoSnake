@@ -10,6 +10,8 @@ function Image(img, index) {
   this.type = "url"; // Is the data type 'url' or 'base64' (data URI)?
   this.isTagged = false; // Has the image already been tagged?
   
+  this.alt = img.alt; // Alt text - send to background.js for comparison with keywords
+  
   // Image sources/base64 data
   this.src = img.src;
   this.base64 = null;
@@ -32,6 +34,7 @@ function Image(img, index) {
   // Sends message to background.js to check if isSnake
   this.isSnake = function () {
     chrome.runtime.sendMessage({
+      alt: this.alt,
       type: this.type,
       source: this.src,
       base64: this.base64,
