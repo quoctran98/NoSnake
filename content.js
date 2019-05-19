@@ -1,44 +1,52 @@
-// Image to replace bad images with -- I can't figure out how to use with images in the folder
+// Image to replace bad images with (this wont work: https://stackoverflow.com/questions/3559781/google-chrome-extensions-cant-load-local-images-with-css)
 const replacementImage = "https://i.imgur.com/8gAet8c.png";
-// All images found on the page
+// All images found on the page (only initially - newly loaded images won't be in here)
 let allImages = [];
 
-// Object to contain images
+// New 'Image' Object
 function Image(img, index) {
   this.img = img;
-  this.src = img.src;
   this.index = index;
+  this.type = "url"; // Is the data type 'url' or 'base64' (data URI)?
+  this.isTagged = false; // Has the image already been tagged?
   
-  // Has it been checked by the script?
-  this.isTagged = false;
+  // Image sources/base64 data
+  this.src = img.src;
+  this.base64 = null;
+  this.src2base64 = function () { // To resolve data URIs
+    if (this.src.substr(0,5) == "data:") { // probably do a regex later with .search()
+      let base64 = this.src.replace("data:image/jpeg;base64,", ""); // 100 % needs to be a regex but just testing now (other image types etc)
+      this.base64 = base64;
+      this.type = "base64";
+    }
+  }
   
-  // Bool if image is in viewport (I stole this from somewhere)
+  // Returns boolean if any part of the image is in the viewport
   this.isLoaded = function () {
     let bounding = this.img.getBoundingClientRect();
     return (
-        bounding.top >= 0 &&
-        bounding.left >= 0 &&
-        bounding.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-        bounding.right <= (window.innerWidth || document.documentElement.clientWidth)
+        bounding.y <= (window.innerHeight + 100|| document.documentElement.clientHeight +100) // adding 100px margin to pre-check images
     );
   };
   
   // Sends message to background.js to check if isSnake
   this.isSnake = function () {
     chrome.runtime.sendMessage({
+      type: this.type,
       source: this.src,
+      base64: this.base64,
       index: this.index,
       }
     )
   }
   
-  // Replaces the image
+  // Replaces the image with 'replacementImage'
   this.replaceImg = function () {
     this.img.src = replacementImage;
     this.img.removeAttribute("srcset");
   }
   
-  // Resets the image
+  // Resets the image (not used at all right now)
   this.resetImg = function () {
     this.img.src = img.src;
     this.img.removeAttribute("srcset");
@@ -46,7 +54,7 @@ function Image(img, index) {
   
 }
 
-// Scans through all untagged images within the viewport and calls .isSnake() for them
+// Scans through all untagged image objects within the viewport and calls .isSnake() for them
 function checkImages() {
   for (i = 0; i < allImages.length; i++) {
     let img = allImages[i];
@@ -68,7 +76,7 @@ chrome.runtime.onMessage.addListener(
     }
 });
 
-// Listens for scrolling and then calls checkImages() -- should I throttle it?
+// Listens for scrolling and constantly calls checkImages()
 window.addEventListener("scroll", function(){
     checkImages();
 });
@@ -77,8 +85,10 @@ window.addEventListener("scroll", function(){
 for (i = 0; i < document.getElementsByTagName('img').length; i++) {
   allImages.push('0');
   allImages[i] = new Image(document.getElementsByTagName('img')[i], i);
-  //allImages[i].replaceImg(); i want to immediately cover all images :(
+  allImages[i].src2base64();
+  //allImages[i].replaceImg();
+  // Ideally I want to replace all images off the bat and use reset images as they're checked (better safe than sorry)
 }
-console.log(allImages.length + " images found in total at: " + window.location.href)
 
-checkImages(); // First call
+console.log(allImages.length + " images found in total at: " + window.location.href)
+checkImages(); // Initial check
