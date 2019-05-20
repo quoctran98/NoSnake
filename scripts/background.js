@@ -53,7 +53,8 @@ let backlogSlow = []; // JSON objects from content.js messages -- run through Cl
 function resolveBacklogSlow () {
   if (backlogSlow.length > 0) { // If there is a backlog:
     let request = backlogSlow[0];
-    
+    backlogSlow.shift();
+
     if (request.data === "url") { // for URL source
       
       console.log("Sent URL request for image #" + request.index + " at " + request.source);
@@ -68,7 +69,7 @@ function resolveBacklogSlow () {
           index: request.index
         });
       });
-      backlogSlow.shift();
+      
       
     } else if (request.data === "base64") { // for base64 data
       
@@ -84,7 +85,6 @@ function resolveBacklogSlow () {
           index: request.index
         });
       });
-      backlogSlow.shift();
       
     }
   }
