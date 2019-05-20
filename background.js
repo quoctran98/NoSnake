@@ -1,7 +1,10 @@
-const clarifaiKey = "";
+const clarifaiKey = "aa85483e9a9144538c8bea5fe28d4754";
+
+let extensionOn = true;
 
 // Bad words :(
-const targetConcepts = ["snake", "dog"];
+const targetConcepts = ["snake", "dog"]; // List of broad Clarifai concepts
+const targetText = ["snake", "dog"]; // Comprehensive list of keywords for alt text searching
 
 // Initializing Clarifai App
 const app = new Clarifai.App({
@@ -26,10 +29,11 @@ function resolveBacklog () {
     let request = backlog[0];
     
     // Check alt text for bad words (faster and save on Clarifai calls)
-    for (i = 0; i < targetConcepts.length; i++) {
-      if (request.alt.search(targetConcepts[i]) != -1) {
-        console.log("Image #" + request.index + " from " + request.sender.tab.url + " has 'snake' in alt text");
+    for (i = 0; i < targetText.length; i++) {
+      if (request.alt.search(targetText[i]) != -1) {
+        console.log("Image #" + request.index + " from " + request.sender.tab.url + " has a bad word in alt text");
         sendToTab(request.sender, {
+          type: "isSnakeReply",
           isSnake: true,
           index: request.index
         });
@@ -37,7 +41,7 @@ function resolveBacklog () {
       }
     }
     
-    if (request.type === "url") { // for URL source
+    if (request.data === "url") { // for URL source
       
       console.log("Sent URL request for image #" + request.index + " at " + request.source);
       // Calls isSnakeURL() and 'resolution' is a boolean from the promise
@@ -46,13 +50,14 @@ function resolveBacklog () {
         console.log("URL image #" + request.index + " from " + request.sender.tab.url + " is of a snake? " + isSnake);
         // Sends the 'resolution' back to the content scripts as '.isSnake'
         sendToTab(request.sender, {
+          type: "isSnakeReply",
           isSnake: isSnake,
           index: request.index
         });
       });
       backlog.shift();
       
-    } else if (request.type === "base64") { // for base64 data
+    } else if (request.data === "base64") { // for base64 data
       
       console.log("Sent base64 request for image #" + request.index);
       // Calls isSnakeBase64() and 'resolution' is a boolean from the promise
@@ -61,6 +66,7 @@ function resolveBacklog () {
         console.log("Base 64 image #" + request.index + " from " + request.sender.tab.url + " is of a snake? " + isSnake);
         // Sends the 'resolution' back to the content scripts as '.isSnake'
         sendToTab(request.sender, {
+          type: "isSnakeReply",
           isSnake: isSnake,
           index: request.index
         });
@@ -130,16 +136,26 @@ function sendToTab (destination, message) {
   chrome.tabs.sendMessage(destination.tab.id, message);
 }
 
-// Listens for message from content.js scripts and adds the JSON requests to backlog[]
+// Listens for message from all scripts
 chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
-    backlog.push({
-      sender: sender,
-      alt: request.alt,
-      type: request.type,
-      source: request.source,
-      base64: request.base64,
-      index: request.index
-    })
+    switch (request.type) {
+    case "isSnake": // NoSnake request
+      if (extensionOn) { // adds the JSON isSnake requests to backlog[]
+        backlog.push({
+          sender: sender,
+          alt: request.alt,
+          data: request.data,
+          source: request.source,
+          base64: request.base64,
+          index: request.index
+        })
+      }
+      break;
+    case "toggleExtension": // Toggle the extension
+      extensionOn = !extensionOn;
+      console.log(extensionOn);
+      break;
+    }
   }
 )

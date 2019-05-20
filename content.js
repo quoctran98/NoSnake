@@ -7,7 +7,7 @@ let allImages = [];
 function Image(img, index) {
   this.img = img;
   this.index = index;
-  this.type = "url"; // Is the data type 'url' or 'base64' (data URI)?
+  this.data = "url"; // The type of data: 'url' or 'base64' (data URI)?
   this.isTagged = false; // Has the image already been tagged?
   
   this.alt = img.alt; // Alt text - send to background.js for comparison with keywords
@@ -17,9 +17,9 @@ function Image(img, index) {
   this.base64 = null;
   this.src2base64 = function () { // To resolve data URIs
     if (this.src.substr(0,5) == "data:") { // probably do a regex later with .search()
-      let base64 = this.src.replace("data:image/jpeg;base64,", ""); // 100 % needs to be a regex but just testing now (other image types etc)
+      let base64 = this.src.replace("data:image/jpeg;base64,", ""); // 100 % needs to be a regex but just testing now (other image formats etc)
       this.base64 = base64;
-      this.type = "base64";
+      this.data = "base64";
     }
   }
   
@@ -34,13 +34,13 @@ function Image(img, index) {
   // Sends message to background.js to check if isSnake
   this.isSnake = function () {
     chrome.runtime.sendMessage({
-      alt: this.alt,
-      type: this.type,
+      type: "isSnake",
+      data: this.data,
       source: this.src,
       base64: this.base64,
+      alt: this.alt,
       index: this.index,
-      }
-    )
+      })
   }
   
   // Replaces the image with 'replacementImage'
@@ -71,11 +71,15 @@ function checkImages() {
 // Listens for replies from background.js and then will do .replaceImage()
 chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
-    console.log("Image #" + request.index + "(" + allImages[request.index].img + ") on this page is a snake? " + request.isSnake);
-    if (request.isSnake) {
-      allImages[request.index].replaceImg();
-    } else {
-      allImages[request.index].resetImg(); // I'm trying to make it so that all images are replaced right off the bat and then reset, but it hasn't been working out.
+    switch (request.type) {
+      case "isSnakeReply": // Replies background isSnake
+        console.log("Image #" + request.index + "(" + allImages[request.index].img + ") on this page is a snake? " + request.isSnake);
+        if (request.isSnake) {
+          allImages[request.index].replaceImg();
+        } else {
+          allImages[request.index].resetImg(); // I'm trying to make it so that all images are replaced right off the bat and then reset, but it hasn't been working out.
+        }
+        break;
     }
 });
 

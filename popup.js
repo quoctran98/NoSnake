@@ -1,15 +1,10 @@
-document.getElementById("toggleExtensionButton").onclick = function(e){
+document.getElementById("toggleExtensionButton").onclick = function(){
   toggleExtension();
 }
 
 function toggleExtension() {
-alert("HI");
-/*	chrome.runtime.sendMessage({
-		greeting: ["toggleExtension",false]
-	},
-	function(response) {
-		document.getElementById("toggleExtensionButton").innerHTML = response.msg;
-	});
-*/
+  chrome.runtime.sendMessage({
+    type: "toggleExtension"
+  })
 }
 
