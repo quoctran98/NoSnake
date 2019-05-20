@@ -3,7 +3,7 @@
 "name": "NoSnake",
 "version": "0.1.1",
 "description": "Chrome extension to block images of snakes online",
-"icons": { "128": "icon_128.png" },
+"icons": { "128": "images/icon_128.png" },
 "permissions": [
 	"storage",
 	"tabs",
@@ -16,7 +16,7 @@
 	},
 "browser_action": {
 	"default_title": "",
-	"default_icon": "icon_128.png",
+	"default_icon": "images/icon_128.png",
 	"default_popup": "popup.html"
 	},
 "content_scripts": [
@@ -24,7 +24,7 @@
 		"matches": [
 			"<all_urls>"
 		],
-		"js": ["content.js"]
+		"js": ["scripts/content.js"]
 	}
 	]
 }
