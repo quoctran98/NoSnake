@@ -22,11 +22,13 @@ function arrayMatches (a, b) {
     return matches;
 }
 
-let backlog = []; // JSON objects from content.js messages
-// Clarifai rate limit is 10 RPS (https://community.clarifai.com/t/api-rate-limiting/528) (should batch requests)
-function resolveBacklog () {
-  if (backlog.length > 0) { // If there is a backlog:
-    let request = backlog[0];
+let backlogFast = []; // JSON objects from content.js messages -- run through alt text checker
+function resolveBacklogFast () {
+  if (backlogFast.length > 0) { // If there is a backlog:
+
+    let request = backlogFast[0];
+    backlogFast.shift(); // Immediately shift, so this doesn't run multiple times on the same item
+    resolveBacklogFast();
     
     // Check alt text for bad words (faster and save on Clarifai calls)
     for (i = 0; i < targetText.length; i++) {
@@ -37,9 +39,20 @@ function resolveBacklog () {
           isSnake: true,
           index: request.index
         });
-        break;
+        return;
       }
     }
+    
+    backlogSlow.push(request); // If no alt text, remove from backlogFast and send to backlogSlow
+  }
+}
+setInterval(resolveBacklogFast, 10); // 10ms delay to check when backlog is empty (when backlog has items, next iteration is called ASAP within function)
+
+let backlogSlow = []; // JSON objects from content.js messages -- run through Clarifai
+// Clarifai rate limit is 10 RPS (https://community.clarifai.com/t/api-rate-limiting/528) (should batch requests)
+function resolveBacklogSlow () {
+  if (backlogSlow.length > 0) { // If there is a backlog:
+    let request = backlogSlow[0];
     
     if (request.data === "url") { // for URL source
       
@@ -55,7 +68,7 @@ function resolveBacklog () {
           index: request.index
         });
       });
-      backlog.shift();
+      backlogSlow.shift();
       
     } else if (request.data === "base64") { // for base64 data
       
@@ -71,12 +84,12 @@ function resolveBacklog () {
           index: request.index
         });
       });
-      backlog.shift();
+      backlogSlow.shift();
       
     }
   }
 }
-setInterval(resolveBacklog, 100); // Resolves backlog every 100ms
+setInterval(resolveBacklogSlow, 100); // Resolves backlogSlow every 100ms
 
 // Promise function that calls the Clarifai API with URL source and resolves to a boolean (copied almost directly from Clarifai's tutorial)
 function isSnakeURL (source) {
@@ -141,8 +154,8 @@ chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
     switch (request.type) {
     case "isSnake": // NoSnake request
-      if (extensionOn) { // adds the JSON isSnake requests to backlog[]
-        backlog.push({
+      if (extensionOn) { // adds the JSON isSnake requests to backlogFast[]
+        backlogFast.push({
           sender: sender,
           alt: request.alt,
           data: request.data,
