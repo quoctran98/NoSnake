@@ -12,12 +12,12 @@
 ],
 "background": {
 	"persistent": true,
-	"page": "background.html"
+	"page": "pages/background.html"
 	},
 "browser_action": {
 	"default_title": "",
 	"default_icon": "images/icon_128.png",
-	"default_popup": "popup.html"
+	"default_popup": "pages/popup.html"
 	},
 "content_scripts": [
 	{
