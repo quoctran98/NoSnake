@@ -12,6 +12,9 @@ function Image(img, index) {
   
   this.alt = img.alt; // Alt text - send to background.js for comparison with keywords
   
+  this.domain = window.location.hostname; // Display location -- for checking with node server
+  this.path = window.location.path;
+
   // Image sources/base64 data
   this.src = img.src;
   this.base64 = null;
@@ -40,6 +43,8 @@ function Image(img, index) {
       base64: this.base64,
       alt: this.alt,
       index: this.index,
+      domain: this.domain,
+      path: this.path
       })
   }
   
@@ -54,7 +59,6 @@ function Image(img, index) {
     this.img.src = img.src;
     this.img.removeAttribute("srcset");
   }
-  
 }
 
 // Scans through all untagged image objects within the viewport and calls .isSnake() for them
@@ -82,6 +86,15 @@ chrome.runtime.onMessage.addListener(
         break;
     }
 });
+
+/*---------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+// Call functions now:
+
+chrome.runtime.sendMessage({ // url > background > node server > background to clear out okay pages
+  type: "checkURL",
+  domain: window.location.hostname,
+  path: window.location.pathname
+})
 
 // Listens for scrolling and constantly calls checkImages()
 window.addEventListener("scroll", function(){

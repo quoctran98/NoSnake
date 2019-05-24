@@ -1,0 +1,17 @@
+<input type = "text" id = "input" value = "hotdogs">
+<button type="button" onclick="loadDoc()">send data</button>
+<p id = "reply"></p>
+<script>
+
+function loadDoc() {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("reply").innerHTML = typeof(this.responseText);
+    }
+  };
+  const input = document.getElementById("input").value;
+  xhttp.open("GET", "http://localhost:8080/urlChecker?val1=" + input, true);
+  xhttp.send();
+}
+</script>

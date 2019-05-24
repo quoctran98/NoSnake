@@ -1,14 +1,21 @@
-const Promise = require("promise");
 const express = require("express");
 
 const app = express();
 
-app.set("view engine", "pug");
+app.get("/urlChecker", function (req, res) {
+    const domain = req.query.domain;
+    const path = req.query.path;
+    console.timeStamp();
+    console.log("Domain: " + domain);
+    console.log("Path: " + path);
+    res.send("true");
+});
 
-app.get("/", function (req, res) {
-    res.render()
-    res.send('hello world');
-    console.log(req);
+app.post("/urlSubmit", function (req, res) {
+    const domain = req.query.domain
+    const path = req.query.path;
+    const isSnake = req.query.isSnake;
+    res.send("Recieved");
 });
 
 app.listen(8080);

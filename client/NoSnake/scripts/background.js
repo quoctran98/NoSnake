@@ -144,6 +144,27 @@ function isSnakeBase64 (base64) {
   })
 }
 
+function checkURL (sender, domain, path) { // AJAX request for URL
+  const serverURL = "http://localhost:8080";
+  const serverPath = "/urlChecker";
+  let xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      const response = this.responseText;
+      console.log(response);
+      if (this.responseText == "true") {
+        // Continue other checks
+      } else if (this.responseText == "false") {
+        // Stop all other checks
+      } else {
+        console.log("Something's wrong with this.responseText! Uh oh!")
+      }
+    }
+  };
+  xhttp.open("GET", serverURL + serverPath + "?domain=" + domain + "&path=" + path, true);
+  xhttp.send();
+}
+
 // Sends a JSON 'message' to tab at 'sender'
 function sendToTab (destination, message) {
   chrome.tabs.sendMessage(destination.tab.id, message);
@@ -157,17 +178,22 @@ chrome.runtime.onMessage.addListener(
       if (extensionOn) { // adds the JSON isSnake requests to backlogFast[]
         backlogFast.push({
           sender: sender,
-          alt: request.alt,
           data: request.data,
           source: request.source,
           base64: request.base64,
-          index: request.index
+          alt: request.alt,
+          index: request.index,
+          domain: request.domain,
+          path: request.path
         })
       }
       break;
     case "toggleExtension": // Toggle the extension
       extensionOn = !extensionOn;
       console.log(extensionOn);
+      break;
+    case "checkURL": // AJAX request for URL
+      checkURL(sender, request.domain, request.path);
       break;
     }
   }

@@ -5,6 +5,8 @@
 "description": "Chrome extension to block images of snakes online",
 "icons": { "128": "images/icon_128.png" },
 "permissions": [
+	"http://www.quoctran.com/",
+	"https://www.quoctran.com/",
 	"storage",
 	"tabs",
 	"<all_urls>", 
