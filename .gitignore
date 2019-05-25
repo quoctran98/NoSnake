@@ -3,3 +3,4 @@
 **/working_files
 **/server/node_modules
 **/server/package-lock.json
+**.secret

@@ -1,4 +1,8 @@
-const clarifaiKey = "aa85483e9a9144538c8bea5fe28d4754";
+let config;
+let 
+fetch(chrome.runtime.getURL("../config.json"))
+  .then(response => {response.json();})
+  .then(json => {console.log(json);});
 
 let extensionOn = true;
 
@@ -25,11 +29,9 @@ function arrayMatches (a, b) {
 let backlogFast = []; // JSON objects from content.js messages -- run through alt text checker
 function resolveBacklogFast () {
   if (backlogFast.length > 0) { // If there is a backlog:
-
     let request = backlogFast[0];
     backlogFast.shift(); // Immediately shift, so this doesn't run multiple times on the same item
     resolveBacklogFast();
-    
     // Check alt text for bad words (faster and save on Clarifai calls)
     for (i = 0; i < targetText.length; i++) {
       if (request.alt.search(targetText[i]) != -1) {
@@ -56,7 +58,7 @@ function resolveBacklogSlow () {
     backlogSlow.shift();
 
     if (request.data === "url") { // for URL source
-      
+
       console.log("Sent URL request for image #" + request.index + " at " + request.source);
       // Calls isSnakeURL() and 'resolution' is a boolean from the promise
       isSnakeURL(request.source).then((resolution) => {
@@ -95,17 +97,15 @@ setInterval(resolveBacklogSlow, 100); // Resolves backlogSlow every 100ms
 function isSnakeURL (source) {
   return new Promise((resolve, reject) => {
     app.models.initModel({id: Clarifai.GENERAL_MODEL, version: "aa7f35c01e0642fda5cf400f543e7c40"})
-        .then(generalModel => {
+        .then(generalModel => { // Predict after init model
           return generalModel.predict(source);
         })
-        .then(response => {
-          
+        .then(response => { // Handle prediction
           // Fills an array with the top 20 concepts returned
           let allConcepts = [];
           for (i = 0; i < 20; i++) {
             allConcepts.push(response['outputs'][0]['data']['concepts'][i].name);
           }
-          
           // Checks if there are similarities between the concepts
           if (arrayMatches(allConcepts, targetConcepts)) {
             resolve(true);
@@ -119,16 +119,13 @@ function isSnakeURL (source) {
 // Promise function that calls the Clarifai API with base64 bytes and resolves to a boolean (copied almost directly from Clarifai's tutorial)
 function isSnakeBase64 (base64) {
   return new Promise((resolve, reject) => {
-    
-    app.models.predict(Clarifai.GENERAL_MODEL, {base64: base64}).then(
-    function(response) {
-      
+    app.models.predict(Clarifai.GENERAL_MODEL, {base64: base64}) // Immedieatly predicts?
+    .then(response => { // Handles prediction
       // Fills an array with the top 20 concepts returned
       let allConcepts = [];
       for (i = 0; i < 20; i++) {
         allConcepts.push(response['outputs'][0]['data']['concepts'][i].name);
       }
-      
       // Checks if there are similarities between the concepts
       if (arrayMatches(allConcepts, targetConcepts)) {
         resolve(true);
@@ -140,20 +137,20 @@ function isSnakeBase64 (base64) {
       console.log(err);
     }
     );
-    
   })
 }
 
 function checkURL (sender, domain, path) { // AJAX request for URL
   const serverURL = "http://localhost:8080";
-  const serverPath = "/urlChecker";
+  const serverPath = "/checkURL";
   let xhttp = new XMLHttpRequest();
+
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
       const response = this.responseText;
       console.log(response);
-      if (this.responseText == "true") {
-        // Continue other checks
+      if (this.responseText == "true") { // AJAX only responds in strings
+        alert("You're at purple.com");
       } else if (this.responseText == "false") {
         // Stop all other checks
       } else {
@@ -161,6 +158,7 @@ function checkURL (sender, domain, path) { // AJAX request for URL
       }
     }
   };
+
   xhttp.open("GET", serverURL + serverPath + "?domain=" + domain + "&path=" + path, true);
   xhttp.send();
 }
