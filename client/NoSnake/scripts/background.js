@@ -1,19 +1,13 @@
-let config;
-let 
-fetch(chrome.runtime.getURL("../config.json"))
-  .then(response => {response.json();})
-  .then(json => {console.log(json);});
-
 let extensionOn = true;
+let config; // config.json -- defined in fetch()
+let app; // Clarifai app -- defined in main()
+// JSON objects from content.js messages
+let backlogFast = []; // run through alt text checker
+let backlogSlow = []; // run through Clarifai
 
-// Bad words :(
-const targetConcepts = ["snake", "dog"]; // List of broad Clarifai concepts
-const targetText = ["snake", "dog"]; // Comprehensive list of keywords for alt text searching
-
-// Initializing Clarifai App
-const app = new Clarifai.App({
- apiKey: clarifaiKey
-})
+// Bad words :( -- incorporate into config.json
+  const targetConcepts = ["snake", "dog"]; // List of broad Clarifai concepts
+  const targetText = ["snake", "dog"]; // Comprehensive list of keywords for alt text searching
 
 // Returns number of matches between two arrays
 function arrayMatches (a, b) {
@@ -26,7 +20,36 @@ function arrayMatches (a, b) {
     return matches;
 }
 
-let backlogFast = []; // JSON objects from content.js messages -- run through alt text checker
+// Sends a JSON 'message' to tab at 'sender'
+function sendToTab (destination, message) {
+  chrome.tabs.sendMessage(destination.tab.id, message);
+}
+
+// Send AJAX request to NodeJS server for bad URL
+function checkURL (sender, domain, path) {
+  const serverURL = config.noSnakeServer;
+  const serverPath = "/checkURL";
+  let xhttp = new XMLHttpRequest();
+
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      const response = this.responseText;
+      console.log(response);
+      if (this.responseText == "true") { // AJAX only responds in strings
+        alert("You're at purple.com");
+      } else if (this.responseText == "false") {
+        // Stop all other checks
+      } else {
+        console.log("Something's wrong with this.responseText! Uh oh!")
+      }
+    }
+  };
+
+  xhttp.open("GET", serverURL + serverPath + "?domain=" + domain + "&path=" + path, true);
+  xhttp.send();
+}
+
+// Checks alt text of backlogFast[]
 function resolveBacklogFast () {
   if (backlogFast.length > 0) { // If there is a backlog:
     let request = backlogFast[0];
@@ -48,10 +71,8 @@ function resolveBacklogFast () {
     backlogSlow.push(request); // If no alt text, remove from backlogFast and send to backlogSlow
   }
 }
-setInterval(resolveBacklogFast, 10); // 10ms delay to check when backlog is empty (when backlog has items, next iteration is called ASAP within function)
 
-let backlogSlow = []; // JSON objects from content.js messages -- run through Clarifai
-// Clarifai rate limit is 10 RPS (https://community.clarifai.com/t/api-rate-limiting/528) (should batch requests)
+// Runs images from backlogSlow - Clarifai rate limit is 10 RPS (https://community.clarifai.com/t/api-rate-limiting/528) (should batch requests)
 function resolveBacklogSlow () {
   if (backlogSlow.length > 0) { // If there is a backlog:
     let request = backlogSlow[0];
@@ -91,9 +112,8 @@ function resolveBacklogSlow () {
     }
   }
 }
-setInterval(resolveBacklogSlow, 100); // Resolves backlogSlow every 100ms
 
-// Promise function that calls the Clarifai API with URL source and resolves to a boolean (copied almost directly from Clarifai's tutorial)
+// Calls the Clarifai API with URL source and resolves to a boolean (copied almost directly from Clarifai's tutorial)
 function isSnakeURL (source) {
   return new Promise((resolve, reject) => {
     app.models.initModel({id: Clarifai.GENERAL_MODEL, version: "aa7f35c01e0642fda5cf400f543e7c40"})
@@ -107,7 +127,7 @@ function isSnakeURL (source) {
             allConcepts.push(response['outputs'][0]['data']['concepts'][i].name);
           }
           // Checks if there are similarities between the concepts
-          if (arrayMatches(allConcepts, targetConcepts)) {
+          if (arrayMatches(allConcepts, targetConcepts) > 0) {
             resolve(true);
           } else {
             resolve(false);
@@ -116,7 +136,7 @@ function isSnakeURL (source) {
   })
 }
 
-// Promise function that calls the Clarifai API with base64 bytes and resolves to a boolean (copied almost directly from Clarifai's tutorial)
+// Calls the Clarifai API with base64 bytes and resolves to a boolean (copied almost directly from Clarifai's tutorial)
 function isSnakeBase64 (base64) {
   return new Promise((resolve, reject) => {
     app.models.predict(Clarifai.GENERAL_MODEL, {base64: base64}) // Immedieatly predicts?
@@ -127,7 +147,7 @@ function isSnakeBase64 (base64) {
         allConcepts.push(response['outputs'][0]['data']['concepts'][i].name);
       }
       // Checks if there are similarities between the concepts
-      if (arrayMatches(allConcepts, targetConcepts)) {
+      if (arrayMatches(allConcepts, targetConcepts) > 0) {
         resolve(true);
       } else {
         resolve(false);
@@ -140,59 +160,52 @@ function isSnakeBase64 (base64) {
   })
 }
 
-function checkURL (sender, domain, path) { // AJAX request for URL
-  const serverURL = "http://localhost:8080";
-  const serverPath = "/checkURL";
-  let xhttp = new XMLHttpRequest();
+fetch(chrome.runtime.getURL("../config.json"))
+  .then(response => response.json())
+  .then(json => {
+    config = json;
+    main();
+  })
 
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      const response = this.responseText;
-      console.log(response);
-      if (this.responseText == "true") { // AJAX only responds in strings
-        alert("You're at purple.com");
-      } else if (this.responseText == "false") {
-        // Stop all other checks
-      } else {
-        console.log("Something's wrong with this.responseText! Uh oh!")
+// main -- called after config.json is parsed
+function main() {
+  console.log("Script started with config: ");
+  console.log(config);
+
+  // Initializing Clarifai App
+  app = new Clarifai.App({
+    apiKey: config.clarifaiKey
+  })
+
+  // Listens for message from all scripts
+  chrome.runtime.onMessage.addListener(
+    function(request, sender, sendResponse) {
+      switch (request.type) {
+      case "isSnake": // NoSnake request
+        if (extensionOn) { // adds the JSON isSnake requests to backlogFast[]
+          backlogFast.push({
+            sender: sender,
+            data: request.data,
+            source: request.source,
+            base64: request.base64,
+            alt: request.alt,
+            index: request.index,
+            domain: request.domain,
+            path: request.path
+          })
+        }
+        break;
+      case "toggleExtension": // Toggle the extension
+        extensionOn = !extensionOn;
+        console.log(extensionOn);
+        break;
+      case "checkURL": // AJAX request for URL
+        checkURL(sender, request.domain, request.path);
+        break;
       }
     }
-  };
+  )
 
-  xhttp.open("GET", serverURL + serverPath + "?domain=" + domain + "&path=" + path, true);
-  xhttp.send();
+  setInterval(resolveBacklogFast, 10); // 10ms delay to check when backlog is empty (when backlog has items, next iteration is called ASAP within function)
+  setInterval(resolveBacklogSlow, 100); // Resolves backlogSlow every 100ms
 }
-
-// Sends a JSON 'message' to tab at 'sender'
-function sendToTab (destination, message) {
-  chrome.tabs.sendMessage(destination.tab.id, message);
-}
-
-// Listens for message from all scripts
-chrome.runtime.onMessage.addListener(
-  function(request, sender, sendResponse) {
-    switch (request.type) {
-    case "isSnake": // NoSnake request
-      if (extensionOn) { // adds the JSON isSnake requests to backlogFast[]
-        backlogFast.push({
-          sender: sender,
-          data: request.data,
-          source: request.source,
-          base64: request.base64,
-          alt: request.alt,
-          index: request.index,
-          domain: request.domain,
-          path: request.path
-        })
-      }
-      break;
-    case "toggleExtension": // Toggle the extension
-      extensionOn = !extensionOn;
-      console.log(extensionOn);
-      break;
-    case "checkURL": // AJAX request for URL
-      checkURL(sender, request.domain, request.path);
-      break;
-    }
-  }
-)
