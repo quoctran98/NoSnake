@@ -1,0 +1,6 @@
+{
+    "clarifaiKey": "",
+    "noSnakeServer": "",
+    "targetConcepts": ["snake"],
+    "targetText": ["snake"] 
+}

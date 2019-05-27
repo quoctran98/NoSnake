@@ -1,13 +1,10 @@
 let extensionOn = true;
+
 let config; // config.json -- defined in fetch()
 let app; // Clarifai app -- defined in main()
-// JSON objects from content.js messages
+// To store JSON objects from content.js messages
 let backlogFast = []; // run through alt text checker
 let backlogSlow = []; // run through Clarifai
-
-// Bad words :( -- incorporate into config.json
-  const targetConcepts = ["snake", "dog"]; // List of broad Clarifai concepts
-  const targetText = ["snake", "dog"]; // Comprehensive list of keywords for alt text searching
 
 // Returns number of matches between two arrays
 function arrayMatches (a, b) {
@@ -56,8 +53,8 @@ function resolveBacklogFast () {
     backlogFast.shift(); // Immediately shift, so this doesn't run multiple times on the same item
     resolveBacklogFast();
     // Check alt text for bad words (faster and save on Clarifai calls)
-    for (i = 0; i < targetText.length; i++) {
-      if (request.alt.search(targetText[i]) != -1) {
+    for (i = 0; i < config.targetText.length; i++) {
+      if (request.alt.search(config.targetText[i]) != -1) {
         console.log("Image #" + request.index + " from " + request.sender.tab.url + " has a bad word in alt text");
         sendToTab(request.sender, {
           type: "isSnakeReply",
@@ -127,7 +124,7 @@ function isSnakeURL (source) {
             allConcepts.push(response['outputs'][0]['data']['concepts'][i].name);
           }
           // Checks if there are similarities between the concepts
-          if (arrayMatches(allConcepts, targetConcepts) > 0) {
+          if (arrayMatches(allConcepts, config.targetConcepts) > 0) {
             resolve(true);
           } else {
             resolve(false);
@@ -147,7 +144,7 @@ function isSnakeBase64 (base64) {
         allConcepts.push(response['outputs'][0]['data']['concepts'][i].name);
       }
       // Checks if there are similarities between the concepts
-      if (arrayMatches(allConcepts, targetConcepts) > 0) {
+      if (arrayMatches(allConcepts, config.targetConcepts) > 0) {
         resolve(true);
       } else {
         resolve(false);
@@ -160,7 +157,7 @@ function isSnakeBase64 (base64) {
   })
 }
 
-fetch(chrome.runtime.getURL("../config.json"))
+fetch(chrome.runtime.getURL("../client_config.json"))
   .then(response => response.json())
   .then(json => {
     config = json;
@@ -169,7 +166,7 @@ fetch(chrome.runtime.getURL("../config.json"))
 
 // main -- called after config.json is parsed
 function main() {
-  console.log("Script started with config: ");
+  console.log("NoSnake script started with config: ");
   console.log(config);
 
   // Initializing Clarifai App

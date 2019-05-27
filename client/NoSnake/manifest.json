@@ -6,8 +6,9 @@
 "icons": { "128": "images/icon_128.png" },
 "permissions": [
 	"tabs",
-	"<all_urls>", 
-],
+	"localhost:8080",
+	"<all_urls>"
+	],
 "background": {
 	"persistent": true,
 	"page": "pages/background.html"
@@ -26,6 +27,6 @@
 	}
 	],
 "web_accessible_resources": [
-		"config.json"
+	"/config.json"
 	]
 }
