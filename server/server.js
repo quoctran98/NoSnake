@@ -20,7 +20,7 @@ app.get("/checkURL", function (req, res) {
     })
 });
 
-app.post("/submitURL", function (req, res) {
+app.get("/submitURL", function (req, res) {
     const domain = req.query.domain
     const path = req.query.path;
     const isSnake = req.query.isSnake;
@@ -30,22 +30,47 @@ app.post("/submitURL", function (req, res) {
 
 function checkURL (domain, path) {
     return new Promise(function (resolve, reject) {
-        const client = new MongoClient(config.mongoURL, { useNewUrlParser: true });
+        const client = new MongoClient(config.mongoURL, {useNewUrlParser: true});
         client.connect()
         .then(db => {
-            const collection = client.db("no_snake_url").collection("yes_snake");
+            const collection = client.db("no_snake_url").collection("no_snake"); // checks list of OK webpages
             return collection.find({domain: domain, path: path}).toArray();
         })
         .then(result => {
-            if (result.length > 0) { // if document exists at all
-                resolve("true");
+            if (result.length > 0) { // if webpage doc exists in collection
+                resolve("no_snakes_here");
             } else {
-                resolve("false");
+                resolve("no_data");
             }
             client.close();
         })
     })
 }
 
+function submitURL (domain, path, isSnake) {
+    if (isSnake == "false") {
+        const client = new MongoClient(config.mongoURL, {useNewUrlParser: true});
+        client.connect()
+        .then(db => {
+            const collection = client.db("no_snake_url").collection("no_snake_beta")
+            collection.insertOne({
+                domain: domain,
+                path: path
+            })
+        })
+    } else if (isSnake == "true") {
+        const client = new MongoClient(config.mongoURL, {useNewUrlParser: true});
+        client.connect()
+        .then(db => {
+            const collection = client.db("no_snake_url").collection("yes_snake_beta")
+            collection.insertOne({
+                domain: domain,
+                path: path
+            })
+        })
+    }
+    client.close();
+}
+
 app.listen(config.port);
-checkURL("purple.com","/").then(result => console.log(result));
+checkURL("www.ncbi.nlm.nih.gov","/").then(result => console.log(result));

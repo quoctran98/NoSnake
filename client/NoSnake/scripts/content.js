@@ -15,6 +15,8 @@ function Image(img, index) {
   this.domain = window.location.hostname; // Display location -- for checking with node server
   this.path = window.location.path;
 
+  this.isSnakeProperty = null; // Not really used right now
+
   // Image sources/base64 data
   this.src = img.src;
   this.base64 = null;
@@ -72,6 +74,9 @@ function checkImages() {
   }
 }
 
+/*---------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+// Call functions now:
+
 // Listens for replies from background.js and then will do .replaceImage()
 chrome.runtime.onMessage.addListener(
   function(request, sender, sendResponse) {
@@ -80,15 +85,22 @@ chrome.runtime.onMessage.addListener(
         console.log("Image #" + request.index + "(" + allImages[request.index].img + ") on this page is a snake? " + request.isSnake);
         if (request.isSnake) {
           allImages[request.index].replaceImg();
+          allImages[request.index].isSnakeProperty = true;
         } else {
           allImages[request.index].resetImg(); // I'm trying to make it so that all images are replaced right off the bat and then reset, but it hasn't been working out.
+          allImages[request.index].isSnakeProperty = false;
         }
         break;
+      case "pageURLCheck": // Page is cleared by node server
+        if (request.isSafe) {
+          for(i = 0; i < allImages.length; i++) {
+            allImages[i].isTagged = true;
+            allImages[i].isSnakeProperty = false;
+          }
+        }
+      break;
     }
 });
-
-/*---------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-// Call functions now:
 
 chrome.runtime.sendMessage({ // url > background > node server > background to clear out okay pages
   type: "checkURL",

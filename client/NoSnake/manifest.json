@@ -6,7 +6,7 @@
 "icons": { "128": "images/icon_128.png" },
 "permissions": [
 	"tabs",
-	"localhost:8080",
+	"http://localhost:8080",
 	"<all_urls>"
 	],
 "background": {

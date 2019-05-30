@@ -28,22 +28,58 @@ function checkURL (sender, domain, path) {
   const serverPath = "/checkURL";
   let xhttp = new XMLHttpRequest();
 
+  // handles response from AJAX
   xhttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
       const response = this.responseText;
-      console.log(response);
-      if (this.responseText == "true") { // AJAX only responds in strings
-        alert("You're at purple.com");
-      } else if (this.responseText == "false") {
-        // Stop all other checks
+
+      if (response == "no_snakes_here") { // IF PAGE IS SAFE
+
+        console.log(domain + path + " is safe from snakes!")
+        sendToTab(sender, {
+          type: "pageURLCheck",
+          isSafe: true
+        });
+        // immediately resolves slow backlog -- if url matches (no need to do it for fast backlog bc it doesnt call clarifai)
+        for (i = 0; i < backlogSlow.length; i++) {
+          let image = backlogSlow[i];
+          if (image.domain == domain && image.path == path) {
+            sendToTab(sender, {
+              type: "isSnakeReply",
+              isSnake: false,
+              index: image.index
+            });
+            backlogSlow.splice(i,1);
+          }
+        }
       } else {
-        console.log("Something's wrong with this.responseText! Uh oh!")
+        // otherwise let everything happen normally
       }
     }
   };
 
   xhttp.open("GET", serverURL + serverPath + "?domain=" + domain + "&path=" + path, true);
   xhttp.send();
+}
+
+function submitURL (domain, path, isSnake) {
+  const serverURL = config.noSnakeServer;
+  const serverPath = "/submitURL";
+  let xhttp = new XMLHttpRequest();
+
+  // handles response from AJAX
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      console.log(this.responseText);
+    }
+  };
+
+  xhttp.open("GET", serverURL + serverPath + "?domain=" + domain + "&path=" + path + "&isSnake=" + isSnake, true); // should I use POST? (secure this!)
+  xhttp.send();
+}
+
+function pageHasSnake () {
+
 }
 
 // Checks alt text of backlogFast[]
@@ -164,7 +200,8 @@ fetch(chrome.runtime.getURL("../client_config.json"))
     main();
   })
 
-// main -- called after config.json is parsed
+/*---------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+// Call functions now in main():
 function main() {
   console.log("NoSnake script started with config: ");
   console.log(config);
@@ -176,7 +213,7 @@ function main() {
 
   // Listens for message from all scripts
   chrome.runtime.onMessage.addListener(
-    function(request, sender, sendResponse) {
+    function(request, sender) {
       switch (request.type) {
       case "isSnake": // NoSnake request
         if (extensionOn) { // adds the JSON isSnake requests to backlogFast[]
@@ -205,4 +242,5 @@ function main() {
 
   setInterval(resolveBacklogFast, 10); // 10ms delay to check when backlog is empty (when backlog has items, next iteration is called ASAP within function)
   setInterval(resolveBacklogSlow, 100); // Resolves backlogSlow every 100ms
+  setInterval(pageHasSnake, 10); // continuously check to see if we should call submitURL
 }
