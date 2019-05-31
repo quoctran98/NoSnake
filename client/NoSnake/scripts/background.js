@@ -224,8 +224,6 @@ function main() {
             base64: request.base64,
             alt: request.alt,
             index: request.index,
-            domain: request.domain,
-            path: request.path
           })
         }
         break;
