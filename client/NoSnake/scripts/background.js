@@ -5,6 +5,7 @@ let app; // Clarifai app -- defined in main()
 // To store JSON objects from content.js messages
 let backlogFast = []; // run through alt text checker
 let backlogSlow = []; // run through Clarifai
+let allSenders = []; // stores 'sender' objects of content scripts (NOT POPUP)
 
 // Returns number of matches between two arrays
 function arrayMatches (a, b) {
@@ -211,7 +212,7 @@ function main() {
     apiKey: config.clarifaiKey
   })
 
-  // Listens for message from all scripts
+  // Listens for message from all scripts (SHOULD BREAK UP INTO ACTUAL FUNCTIONS)
   chrome.runtime.onMessage.addListener(
     function(request, sender) {
       switch (request.type) {
@@ -229,11 +230,23 @@ function main() {
         break;
       case "toggleExtension": // Toggle the extension
         extensionOn = !extensionOn;
-        console.log(extensionOn);
+        chrome.runtime.sendMessage({
+          type: "toggleExtensionReply",
+          extensionOn: extensionOn
+        });
+        for (i = 0; i < allSenders.length; i++) { // Sending to all content scripts!
+          sendToTab(allSenders[i], {
+            type: "extensionToggled",
+            extensionOn: extensionOn
+          })
+        }
         break;
       case "checkURL": // AJAX request for URL
         checkURL(sender, request.domain, request.path);
         break;
+      case "newConnection": // 
+        allSenders.push(sender);
+      break;
       }
     }
   )

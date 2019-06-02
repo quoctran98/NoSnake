@@ -3,14 +3,14 @@ const replacementImage = "https://i.imgur.com/8gAet8c.png";
 const placeholderImage = "https://i.imgur.com/MSg2a9d.jpg";
 
 // All images found on the page (only initially - newly loaded images won't be in here)
-let allImages = [];
+let imageArr = [];
 
 // New 'Image' Object
 class Image {
   constructor(img, index) {
     // Script properties
     this.isSnake = null;
-    this.index = index; // Index within allImages[]
+    this.index = index; // Index within imageArr[]
     this.isTagged = false; // Has the image already been tagged?
     // DOM element properties
     this.img = img;
@@ -62,8 +62,8 @@ class Image {
 
 // Sends images to be checked
 function checkImages() {
-  for (i = 0; i < allImages.length; i++) {
-    let img = allImages[i];
+  for (i = 0; i < imageArr.length; i++) {
+    let img = imageArr[i];
     if (img.isLoaded() && !img.isTagged) {
       img.isTagged = true;
       img.isSnakeCheck();
@@ -71,10 +71,10 @@ function checkImages() {
   }
 }
 
-// Makes corrections to images
+// Makes corrections to images (SHOULD I CALL THIS SO MUCH?)
 function updateImages() {
-  for (i = 0; i < allImages.length; i++) {
-    let img = allImages[i];
+  for (i = 0; i < imageArr.length; i++) {
+    let img = imageArr[i];
     if (img.isSnake == true) {
       img.replaceImg();
     } else if (img.isSnake == false) {
@@ -90,10 +90,12 @@ function updateImages() {
 
 // Listens for replies from background.js and then will do .replaceImage()
 chrome.runtime.onMessage.addListener(
-  function(request, sender, sendResponse) {
-    let img = allImages[request.index];
+  function(request, sender) {
     switch (request.type) {
-      case "isSnakeReply": // Replies background isSnake
+      
+      // Replies frombackground isSnake
+      case "isSnakeReply": 
+        let img = imageArr[request.index];
         console.log("Image #" + request.index + " on this page is a snake? " + request.isSnake);
         console.log(img.img);
         if (request.isSnake) {
@@ -103,18 +105,44 @@ chrome.runtime.onMessage.addListener(
         }
         updateImages(); // updates all images based on .isSnake property?
         break;
-      case "pageURLCheck": // Page is cleared by node server
+      
+        // Page is cleared by node server
+      case "pageURLCheck": 
         if (request.isSafe) {
-          for(i = 0; i < allImages.length; i++) {
-            allImages[i].isTagged = true;
-            allImages[i].isSnake = false;
+          for(i = 0; i < imageArr.length; i++) {
+            imageArr[i].isTagged = true;
+            imageArr[i].isSnake = false;
           }
         }
-      break;
+        break;
+
+      // When extension is toggled
+      case "extensionToggled":
+        if (request.extensionOn) { // turned back on
+          for (i = 0; i < imageArr.length; i++) {
+            imageArr[i].isSnake = null;
+            imageArr[i].isTagged = false;
+          }
+          updateImages();
+          checkImages();
+        } else { // turned off
+          for (i = 0; i < imageArr.length; i++) {
+            imageArr[i].isSnake = false;
+            imageArr[i].isTagged = true;
+          }
+          updateImages();
+        }
+        break;
     }
 });
 
-chrome.runtime.sendMessage({ // url > background > node server > background to clear out okay pages
+// Registers this content script with background.js\
+chrome.runtime.sendMessage({
+  type: "newConnection",
+})
+
+// Calls checkURL() at background.js
+chrome.runtime.sendMessage({
   type: "checkURL",
   domain: window.location.hostname,
   path: window.location.pathname
@@ -125,14 +153,14 @@ window.addEventListener("scroll", function(){
     checkImages();
 });
 
-// Loads all images into allImages[]
+// Loads all images into imageArr[]
 for (i = 0; i < document.getElementsByTagName('img').length; i++) {
-  allImages.push('0');
-  allImages[i] = new Image(document.getElementsByTagName('img')[i], i);
-  allImages[i].src2base64();
-  allImages[i].setPlaceholder();
-  allImages[i].resetImg();
+  imageArr.push('0');
+  imageArr[i] = new Image(document.getElementsByTagName('img')[i], i);
+  imageArr[i].src2base64();
+  imageArr[i].setPlaceholder();
+  imageArr[i].resetImg();
 }
 
-console.log(allImages.length + " images found in total at: " + window.location.href)
+console.log(imageArr.length + " images found in total at: " + window.location.href)
 checkImages(); // Initial check
