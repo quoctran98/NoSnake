@@ -4,3 +4,4 @@
 **/server/node_modules
 **/server/package-lock.json
 **.secret
+**/test_pages

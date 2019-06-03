@@ -2,9 +2,11 @@ let extensionOn = true;
 
 let config; // config.json -- defined in fetch()
 let app; // Clarifai app -- defined in main()
+
 // To store JSON objects from content.js messages
-let backlogFast = []; // run through alt text checker
-let backlogSlow = []; // run through Clarifai
+let backlogStorage = []; // check against previously tagged images
+let backlogAlt = []; // check alt text
+let backlogClarifai = []; // check through Clarifai
 let allSenders = []; // stores 'sender' objects of content scripts (NOT POPUP)
 
 // Returns number of matches between two arrays
@@ -42,15 +44,15 @@ function checkURL (sender, domain, path) {
           isSafe: true
         });
         // immediately resolves slow backlog -- if url matches (no need to do it for fast backlog bc it doesnt call clarifai)
-        for (i = 0; i < backlogSlow.length; i++) {
-          let image = backlogSlow[i];
+        for (i = 0; i < backlogClarifai.length; i++) {
+          let image = backlogClarifai[i];
           if (image.domain == domain && image.path == path) {
             sendToTab(sender, {
               type: "isSnakeReply",
               isSnake: false,
               index: image.index
             });
-            backlogSlow.splice(i,1);
+            backlogClarifai.splice(i,1);
           }
         }
       } else {
@@ -83,63 +85,127 @@ function pageHasSnake () {
 
 }
 
-// Checks alt text of backlogFast[]
-function resolveBacklogFast () {
-  if (backlogFast.length > 0) { // If there is a backlog:
-    let request = backlogFast[0];
-    backlogFast.shift(); // Immediately shift, so this doesn't run multiple times on the same item
-    resolveBacklogFast();
+// add a resolved image to local storage
+function addLocalStorage (img, isSnake) {
+  if (img.data == "url") {
+    let key = img.src.toString();
+    /*
+    chrome.storage.local.set({key: isSnake}, function () {
+      console.log(key +" is set to " + isSnake);
+    });;
+    */
+    localStorage.setItem(key, isSnake);
+  }
+}
+
+// Checks local storage of backlogStorage[]
+function resolveBacklogStorage () {
+  if (backlogStorage.length > 0) { // if there is a backlog:
+    let img = backlogStorage[0];
+    backlogStorage.shift();
+    resolveBacklogStorage();
+    // sees if image url is stored in local storage
+    if (img.data == "url") {
+      let key = img.src.toString();
+      /*
+      chrome.storage.local.get(key, function (result) {
+        console.log(result);
+        if (typeof result.src === "undefined") { // if url is not in storage yet
+          backlogAlt.push(img);
+          return;
+        } else {
+          let isSnake = result.src;
+          console.log("I've seen image #" + img.index + " from " + img.sender.tab.url + " before: " + isSnake);
+          sendToTab(img.sender, {
+            type: "isSnakeReply",
+            isSnake: isSnake,
+            index: img.index
+          })
+          return;
+        }
+      });
+      */
+     let isSnake = localStorage[key];
+     if (typeof isSnake === "undefined") { // if url is not in storage yet
+       backlogAlt.push(img);
+       return;
+     } else {
+       if (isSnake == "true") {
+         isSnake = true;
+       } else {
+         isSnake = false;
+       }
+       console.log("Memory of #" + img.index + ":" + isSnake);
+       sendToTab(img.sender, {
+         type: "isSnakeReply",
+         isSnake: isSnake,
+         index: img.index
+       })
+       return;
+     }
+    } else { // base 64 images aren't stored, so you gotta do other stuff
+      backlogAlt.push(img);
+    }
+  }
+}
+
+// Checks alt text of backlogAlt[]
+function resolveBacklogAlt () {
+  if (backlogAlt.length > 0) { // If there is a backlog:
+    let img = backlogAlt[0];
+    backlogAlt.shift(); // Immediately shift, so this doesn't run multiple times on the same item
+    resolveBacklogAlt();
     // Check alt text for bad words (faster and save on Clarifai calls)
     for (i = 0; i < config.targetText.length; i++) {
-      if (request.alt.search(config.targetText[i]) != -1) {
-        console.log("Image #" + request.index + " from " + request.sender.tab.url + " has a bad word in alt text");
-        sendToTab(request.sender, {
+      if (img.alt.search(config.targetText[i]) != -1) {
+        addLocalStorage(img, true);
+        console.log("Alt text #" + img.index + ":" + true);
+        sendToTab(img.sender, {
           type: "isSnakeReply",
           isSnake: true,
-          index: request.index
+          index: img.index
         });
         return;
       }
     }
     
-    backlogSlow.push(request); // If no alt text, remove from backlogFast and send to backlogSlow
+    backlogClarifai.push(img); // If no alt text, remove from backlogAlt and send to backlogClarifai
   }
 }
 
-// Runs images from backlogSlow - Clarifai rate limit is 10 RPS (https://community.clarifai.com/t/api-rate-limiting/528) (should batch requests)
-function resolveBacklogSlow () {
-  if (backlogSlow.length > 0) { // If there is a backlog:
-    let request = backlogSlow[0];
-    backlogSlow.shift();
+// Runs images from backlogClarifai - Clarifai rate limit is 10 RPS (https://community.clarifai.com/t/api-rate-limiting/528) (should batch requests)
+function resolveBacklogClarifai () {
+  if (backlogClarifai.length > 0) { // If there is a backlog:
+    let img = backlogClarifai[0];
+    backlogClarifai.shift();
 
-    if (request.data === "url") { // for URL source
+    if (img.data === "url") { // for URL source
 
-      console.log("Sent URL request for image #" + request.index + " at " + request.source);
       // Calls isSnakeURL() and 'resolution' is a boolean from the promise
-      isSnakeURL(request.source).then((resolution) => {
+      isSnakeURL(img.src).then((resolution) => {
         let isSnake = resolution;
-        console.log("URL image #" + request.index + " from " + request.sender.tab.url + " is of a snake? " + isSnake);
+        console.log("Clarifai url of #" + img.index + ":" + isSnake);
         // Sends the 'resolution' back to the content scripts as '.isSnake'
-        sendToTab(request.sender, {
+        addLocalStorage(img, isSnake);
+        sendToTab(img.sender, {
           type: "isSnakeReply",
           isSnake: isSnake,
-          index: request.index
+          index: img.index
         });
       });
       
       
-    } else if (request.data === "base64") { // for base64 data
+    } else if (img.data === "base64") { // for base64 data (DON'T BOTHER WITH addLocalStorage())
       
-      console.log("Sent base64 request for image #" + request.index);
       // Calls isSnakeBase64() and 'resolution' is a boolean from the promise
-      isSnakeBase64(request.base64).then((resolution) => {
+      isSnakeBase64(img.base64).then((resolution) => {
         let isSnake = resolution;
-        console.log("Base 64 image #" + request.index + " from " + request.sender.tab.url + " is of a snake? " + isSnake);
+        console.log("Clarifai base64 of #" + img.index + ":" + isSnake);
         // Sends the 'resolution' back to the content scripts as '.isSnake'
-        sendToTab(request.sender, {
+        sendToTab(img.sender, {
           type: "isSnakeReply",
           isSnake: isSnake,
-          index: request.index
+          index: img.index
         });
       });
       
@@ -217,11 +283,11 @@ function main() {
     function(request, sender) {
       switch (request.type) {
       case "isSnake": // NoSnake request
-        if (extensionOn) { // adds the JSON isSnake requests to backlogFast[]
-          backlogFast.push({
+        if (extensionOn) { // adds the JSON isSnake requests to backlogAlt[]
+          backlogStorage.push({
             sender: sender,
             data: request.data,
-            source: request.source,
+            src: request.src,
             base64: request.base64,
             alt: request.alt,
             index: request.index,
@@ -251,7 +317,8 @@ function main() {
     }
   )
 
-  setInterval(resolveBacklogFast, 10); // 10ms delay to check when backlog is empty (when backlog has items, next iteration is called ASAP within function)
-  setInterval(resolveBacklogSlow, 100); // Resolves backlogSlow every 100ms
+  setInterval(resolveBacklogStorage, 10); // 10ms delay to check when backlog is empty (when backlog has items, next iteration is called ASAP within function)
+  setInterval(resolveBacklogAlt, 10); // 10ms delay to check when backlog is empty (when backlog has items, next iteration is called ASAP within function)
+  setInterval(resolveBacklogClarifai, 100); // Resolves backlogClarifai every 100ms
   setInterval(pageHasSnake, 10); // continuously check to see if we should call submitURL
 }

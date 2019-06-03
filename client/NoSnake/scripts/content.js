@@ -36,7 +36,7 @@ class Image {
       chrome.runtime.sendMessage({
         type: "isSnake",
         data: this.data,
-        source: this.src,
+        src: this.src,
         base64: this.base64,
         alt: this.alt,
         index: this.index,
@@ -138,7 +138,7 @@ chrome.runtime.onMessage.addListener(
 
 // Registers this content script with background.js\
 chrome.runtime.sendMessage({
-  type: "newConnection",
+  type: "newConnection"
 })
 
 // Calls checkURL() at background.js
